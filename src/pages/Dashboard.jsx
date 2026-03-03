@@ -122,8 +122,8 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatsCard
             title="Energia Total"
-            value={stats.totalEnergy >= 1000 ? (stats.totalEnergy / 1000).toFixed(2) : stats.totalEnergy.toFixed(2)}
-            unit={stats.totalEnergy >= 1000 ? "MWh" : "kWh"}
+            value={stats.totalEnergy.toFixed(2)}
+            unit="kWh"
             icon={Zap}
             color="bg-yellow-400"
           />
