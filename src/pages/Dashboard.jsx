@@ -96,6 +96,9 @@ export default function Dashboard() {
             <a href={createPageUrl("Relatorios")} className="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:bg-gray-50">
               <BarChart2 className="w-4 h-4 mr-2" /> Relatórios
             </a>
+            <a href={createPageUrl("Tarifas")} className="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:bg-gray-50">
+              <Zap className="w-4 h-4 mr-2" /> Tarifas
+            </a>
             <Button
               onClick={() => setShowUpload(!showUpload)}
               className={showUpload ? "bg-gray-200 text-gray-700 hover:bg-gray-300" : "bg-yellow-400 hover:bg-yellow-500 text-white"}
