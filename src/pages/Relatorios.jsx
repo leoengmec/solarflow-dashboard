@@ -25,14 +25,16 @@ export default function Relatorios() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const [u, e, c] = await Promise.all([
+      const [u, e, c, t] = await Promise.all([
         base44.entities.ConsumerUnit.list("name", 100),
         base44.entities.EnergyRecord.list("-date", 5000),
         base44.entities.ConsumptionRecord.list("-month", 500),
+        base44.entities.TariffRecord.list("-effective_month", 1000),
       ]);
       setUnits(u);
       setEnergyRecords(e);
       setConsumptionRecords(c);
+      setTariffRecords(t);
       setLoading(false);
     };
     load();
