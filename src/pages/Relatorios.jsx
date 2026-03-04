@@ -66,6 +66,14 @@ export default function Relatorios() {
     [monthConsumption]
   );
 
+  // Find the applicable tariff for a unit/month: latest TariffRecord with effective_month <= selectedMonth
+  const getTariff = (unitId) => {
+    const unitTariffs = tariffRecords
+      .filter(t => t.consumer_unit_id === unitId && t.effective_month <= selectedMonth)
+      .sort((a, b) => b.effective_month.localeCompare(a.effective_month));
+    return unitTariffs[0]?.tariff_kwh || null;
+  };
+
   // Build per-unit report data
   const reportData = useMemo(() => {
     return units.map(unit => {
@@ -73,7 +81,8 @@ export default function Relatorios() {
       const right = (monthGeneration * quota) / 100;
       const cons = monthConsumption.find(c => c.consumer_unit_id === unit.id);
       const consumption = cons?.consumption_kwh || 0;
-      const tariff = cons?.tariff_kwh || unit.tariff_kwh || 0;
+      // Priority: TariffRecord history > ConsumptionRecord tariff > ConsumerUnit tariff
+      const tariff = getTariff(unit.id) ?? cons?.tariff_kwh ?? unit.tariff_kwh ?? 0;
       const compensated = Math.min(right, consumption);
       const balance = right - consumption;
       const savings = compensated * tariff;
@@ -83,7 +92,7 @@ export default function Relatorios() {
         code: unit.code || "-",
         is_main: unit.is_main,
         quota,
-        right: right,
+        right,
         consumption,
         compensated,
         balance,
@@ -91,7 +100,8 @@ export default function Relatorios() {
         savings,
       };
     });
-  }, [units, monthGeneration, monthConsumption]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [units, monthGeneration, monthConsumption, tariffRecords, selectedMonth]);
 
   const handleExportCsv = () => exportToCsv(reportData, selectedMonth);
   const handleExportPdf = () => exportToPdf(reportData, selectedMonth, monthGeneration, totalConsumption);
