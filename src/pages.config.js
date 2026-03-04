@@ -49,12 +49,14 @@
  */
 import Dashboard from './pages/Dashboard';
 import Relatorios from './pages/Relatorios';
+import Unidades from './pages/Unidades';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
     "Dashboard": Dashboard,
     "Relatorios": Relatorios,
+    "Unidades": Unidades,
 }
 
 export const pagesConfig = {

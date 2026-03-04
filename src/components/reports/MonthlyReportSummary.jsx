@@ -3,12 +3,12 @@ import { ptBR } from "date-fns/locale";
 import { Zap, Users, TrendingUp, DollarSign } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
-function StatBox({ label, value, unit, icon: Icon, color }) {
+function StatBox({ label, value, unit, IconComp, color }) {
   return (
     <Card className="border-0 shadow-sm">
       <CardContent className="p-5 flex items-center gap-4">
         <div className={`p-3 rounded-xl ${color}`}>
-          <Icon className="w-5 h-5 text-white" />
+          <IconComp className="w-5 h-5 text-white" />
         </div>
         <div>
           <p className="text-xs text-gray-400 font-medium">{label}</p>
