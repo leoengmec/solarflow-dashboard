@@ -15,6 +15,7 @@ export default function Relatorios() {
   const [units, setUnits] = useState([]);
   const [energyRecords, setEnergyRecords] = useState([]);
   const [consumptionRecords, setConsumptionRecords] = useState([]);
+  const [tariffRecords, setTariffRecords] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Default to current month
