@@ -89,13 +89,21 @@ export default function Dashboard() {
               <p className="text-xs text-gray-400">Monitoramento de Geração Solar</p>
             </div>
           </div>
-          <Button
-            onClick={() => setShowUpload(!showUpload)}
-            className={showUpload ? "bg-gray-200 text-gray-700 hover:bg-gray-300" : "bg-yellow-400 hover:bg-yellow-500 text-white"}
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            {showUpload ? "Fechar Upload" : "Importar CSV"}
-          </Button>
+          <div className="flex gap-2">
+            <a href={createPageUrl("Unidades")} className="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:bg-gray-50">
+              <Users className="w-4 h-4 mr-2" /> Unidades
+            </a>
+            <a href={createPageUrl("Relatorios")} className="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:bg-gray-50">
+              <BarChart2 className="w-4 h-4 mr-2" /> Relatórios
+            </a>
+            <Button
+              onClick={() => setShowUpload(!showUpload)}
+              className={showUpload ? "bg-gray-200 text-gray-700 hover:bg-gray-300" : "bg-yellow-400 hover:bg-yellow-500 text-white"}
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              {showUpload ? "Fechar Upload" : "Importar"}
+            </Button>
+          </div>
         </div>
       </div>
 
