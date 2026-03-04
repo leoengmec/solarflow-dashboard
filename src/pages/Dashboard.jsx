@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { format, subDays, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Sun, Zap, TrendingUp, Upload, BarChart2, Users } from "lucide-react";
+
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
 
