@@ -32,10 +32,10 @@ export default function MonthlyReportSummary({ month, generation, totalConsumpti
     <div>
       <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 capitalize">{monthLabel}</h2>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatBox label="Geração Total" value={generation.toFixed(2)} unit="kWh" icon={Zap} color="bg-yellow-400" />
-        <StatBox label="Consumo Total" value={totalConsumption.toFixed(2)} unit="kWh" icon={TrendingUp} color="bg-orange-400" />
-        <StatBox label="Energia Compensada" value={totalCompensated.toFixed(2)} unit="kWh" icon={Zap} color="bg-green-400" />
-        <StatBox label="Economia Total" value={`R$ ${totalSavings.toFixed(2)}`} unit="" icon={DollarSign} color="bg-blue-400" />
+        <StatBox label="Geração Total" value={generation.toFixed(2)} unit="kWh" IconComp={Zap} color="bg-yellow-400" />
+        <StatBox label="Consumo Total" value={totalConsumption.toFixed(2)} unit="kWh" IconComp={TrendingUp} color="bg-orange-400" />
+        <StatBox label="Energia Compensada" value={totalCompensated.toFixed(2)} unit="kWh" IconComp={Zap} color="bg-green-400" />
+        <StatBox label="Economia Total" value={`R$ ${totalSavings.toFixed(2)}`} unit="" IconComp={DollarSign} color="bg-blue-400" />
       </div>
     </div>
   );
