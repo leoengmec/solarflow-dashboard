@@ -28,37 +28,25 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const token = Deno.env.get('GROWATT_TOKEN')?.trim();
+    const token = Deno.env.get('GROWATT_TOKEN')?.replace(/[^a-zA-Z0-9]/g, '');
     const sn = Deno.env.get('GROWATT_SN')?.trim();
     console.log('Token len:', token?.length, 'SN:', sn);
 
     if (!token || !sn) return Response.json({ error: 'GROWATT_TOKEN e GROWATT_SN são obrigatórios' }, { status: 400 });
 
-    // 1. Listar plantas
-    const plantsData = await growattGet('plant/list', token, { page: '', perpage: '' });
-    console.log('Plants response:', JSON.stringify(plantsData));
-
-    const plants = plantsData.data?.plants || plantsData.data || [];
-    const plantsArr = Array.isArray(plants) ? plants : [];
-    const plant = plantsArr.find(p => (p.name || p.plantName || '').includes('Elias Alves')) || plantsArr[0];
-
-    if (!plant) return Response.json({ error: 'Nenhuma planta encontrada', raw: plantsData }, { status: 404 });
-
-    const plantId = plant.plant_id || plant.plantId || plant.id;
-
-    // 2. Buscar histórico de geração por planta (energy history mensal)
+    // Buscar histórico diretamente pelo SN do inversor
     const end = new Date().toISOString().split('T')[0];
     const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    const historyData = await growattGet('plant/energy', token, {
-      plant_id: plantId,
+    const historyData = await growattGet('device/inverter/data', token, {
+      device_sn: sn,
       start_date: start,
       end_date: end,
       time_unit: 'day',
     });
     console.log('History response:', JSON.stringify(historyData).substring(0, 600));
 
-    const energies = historyData.data?.energies || historyData.data?.datas || historyData.data || [];
+    const energies = historyData.data?.datas || historyData.data?.energies || historyData.data?.histories || [];
     if (!Array.isArray(energies) || energies.length === 0) {
       return Response.json({ success: true, count: 0, message: 'Sem dados no período', raw: historyData });
     }
@@ -81,7 +69,7 @@ Deno.serve(async (req) => {
       await base44.asServiceRole.entities.EnergyRecord.bulkCreate(toCreate);
     }
 
-    return Response.json({ success: true, count: toCreate.length, plantId, plant: plant.name || plant.plantName });
+    return Response.json({ success: true, count: toCreate.length, sn });
   } catch (error) {
     console.error('Growatt sync error:', error.message);
     return Response.json({ error: error.message }, { status: 500 });
