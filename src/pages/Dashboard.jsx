@@ -1,25 +1,10 @@
-// Adicione estes imports no topo:
-import { useGrowattData } from '@/hooks/useGrowattData';
-
-// Dentro função Dashboard(), após const [showUpload, setShowUpload] = useState(false);:
-const { records: growattRecords, isLoading: growattLoading, sync: syncGrowatt } = useGrowattData(period);
-
-// No JSX, após <PeriodSelector /> (dentro do div bg-white):
-<Button 
-  onClick={() => syncGrowatt(growattRecords || [])}
-  disabled={growattLoading || !growattRecords}
-  className="bg-blue-500 hover:bg-blue-600 ml-4"
->
-  🔄 Sync Growatt Automático
-</Button>
 import { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
-import { format, subDays, parseISO, startOfMonth, endOfMonth } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { format, subDays } from "date-fns";
 import { Sun, Zap, TrendingUp, Upload, BarChart2, Users } from "lucide-react";
-
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
+import { useGrowattData } from '@/hooks/useGrowattData';
 
 import StatsCard from "../components/dashboard/StatsCard";
 import PeriodSelector from "../components/dashboard/PeriodSelector";
@@ -31,16 +16,12 @@ import CsvUploader from "../components/upload/CsvUploader";
 function groupRecords(records, period) {
   const daysDiff = (new Date(period.end) - new Date(period.start)) / (1000 * 60 * 60 * 24);
   let groupBy = "day";
-  if (daysDiff > 365) groupBy = "month";
-  else if (daysDiff > 90) groupBy = "month";
+  if (daysDiff > 90) groupBy = "month";
 
   const groups = {};
   records.forEach(r => {
-    let key;
     const d = r.date;
-    if (groupBy === "month") key = d.substring(0, 7);
-    else key = d;
-
+    const key = groupBy === "month" ? d.substring(0, 7) : d;
     if (!groups[key]) groups[key] = { label: key, energy_kwh: 0, max_power_kw: 0, count: 0 };
     groups[key].energy_kwh += r.energy_kwh || 0;
     groups[key].max_power_kw = Math.max(groups[key].max_power_kw, r.power_kw || 0);
@@ -60,6 +41,8 @@ export default function Dashboard() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
+
+  const { records: growattRecords, isLoading: growattLoading, sync: syncGrowatt } = useGrowattData(period);
 
   const loadData = async () => {
     setLoading(true);
@@ -83,7 +66,7 @@ export default function Dashboard() {
     const totalEnergy = records.reduce((s, r) => s + (r.energy_kwh || 0), 0);
     const maxPower = Math.max(...records.map(r => r.power_kw || 0), 0);
     const avgDaily = records.length > 0 ? totalEnergy / new Set(records.map(r => r.date)).size : 0;
-    const co2Saved = totalEnergy * 0.4; // ~0.4 kg CO2 per kWh
+    const co2Saved = totalEnergy * 0.4;
     return { totalEnergy, maxPower, avgDaily, co2Saved };
   }, [records]);
 
@@ -141,33 +124,22 @@ export default function Dashboard() {
         )}
 
         {/* Period Selector */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
           <PeriodSelector period={period} onPeriodChange={setPeriod} />
+          <Button
+            onClick={() => syncGrowatt(growattRecords || [])}
+            disabled={growattLoading || !growattRecords}
+            className="bg-blue-500 hover:bg-blue-600 text-white"
+          >
+            🔄 Sync Growatt
+          </Button>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatsCard
-            title="Energia Total"
-            value={stats.totalEnergy.toFixed(2)}
-            unit="kWh"
-            icon={Zap}
-            color="bg-yellow-400"
-          />
-          <StatsCard
-            title="Média Diária"
-            value={stats.avgDaily.toFixed(2)}
-            unit="kWh/dia"
-            icon={BarChart2}
-            color="bg-orange-400"
-          />
-          <StatsCard
-            title="Pico de Potência"
-            value={stats.maxPower.toFixed(2)}
-            unit="kW"
-            icon={TrendingUp}
-            color="bg-amber-400"
-          />
+          <StatsCard title="Energia Total" value={stats.totalEnergy.toFixed(2)} unit="kWh" icon={Zap} color="bg-yellow-400" />
+          <StatsCard title="Média Diária" value={stats.avgDaily.toFixed(2)} unit="kWh/dia" icon={BarChart2} color="bg-orange-400" />
+          <StatsCard title="Pico de Potência" value={stats.maxPower.toFixed(2)} unit="kW" icon={TrendingUp} color="bg-amber-400" />
           <StatsCard
             title="CO₂ Evitado"
             value={stats.co2Saved >= 1000 ? (stats.co2Saved / 1000).toFixed(2) : stats.co2Saved.toFixed(1)}
