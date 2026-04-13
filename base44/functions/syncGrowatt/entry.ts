@@ -1,68 +1,87 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+const BASE = 'https://openapi.growatt.com';
+
+// Growatt OpenAPI V1 usa GET com query string e token no header
+async function growattGet(path, token, params = {}) {
+  const url = new URL(`${BASE}/v1/${path}`);
+  Object.entries(params).forEach(([k, v]) => { if (v !== '') url.searchParams.set(k, v); });
+  const res = await fetch(url.toString(), {
+    headers: { 'token': token },
+  });
+  return res.json();
+}
+
+async function growattPost(path, token, formData = {}) {
+  const body = new URLSearchParams(formData).toString();
+  const res = await fetch(`${BASE}/v1/${path}`, {
+    method: 'POST',
+    headers: { 'token': token, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+  return res.json();
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const token = Deno.env.get('GROWATT_TOKEN');
-    const sn = Deno.env.get('GROWATT_SN');
+    const token = Deno.env.get('GROWATT_TOKEN')?.trim();
+    const sn = Deno.env.get('GROWATT_SN')?.trim();
+    console.log('Token len:', token?.length, 'SN:', sn);
 
-    if (!token || !sn) {
-      return Response.json({ error: 'GROWATT_TOKEN e GROWATT_SN são obrigatórios' }, { status: 400 });
-    }
+    if (!token || !sn) return Response.json({ error: 'GROWATT_TOKEN e GROWATT_SN são obrigatórios' }, { status: 400 });
 
-    // Buscar lista de plantas
-    const plantsRes = await fetch('https://server.growatt.com/v1/plant/getplantlistbypage', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ page: 1, pageSize: 50 }),
-    });
-    const plantsData = await plantsRes.json();
-    const plants = plantsData.data || [];
-    const plant = plants.find(p => p.plantName?.includes('Elias Alves')) || plants[0];
+    // 1. Listar plantas
+    const plantsData = await growattGet('plant/list', token, { page: '', perpage: '' });
+    console.log('Plants response:', JSON.stringify(plantsData));
 
-    if (!plant) {
-      return Response.json({ error: 'Nenhuma planta encontrada. Verifique o token Growatt.' }, { status: 404 });
-    }
+    const plants = plantsData.data?.plants || plantsData.data || [];
+    const plantsArr = Array.isArray(plants) ? plants : [];
+    const plant = plantsArr.find(p => (p.name || p.plantName || '').includes('Elias Alves')) || plantsArr[0];
 
-    const plantId = plant.plantId;
+    if (!plant) return Response.json({ error: 'Nenhuma planta encontrada', raw: plantsData }, { status: 404 });
+
+    const plantId = plant.plant_id || plant.plantId || plant.id;
+
+    // 2. Buscar histórico de geração por planta (energy history mensal)
     const end = new Date().toISOString().split('T')[0];
     const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    // Buscar histórico de geração
-    const historyRes = await fetch('https://server.growatt.com/v1/device/gethistorydata', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sn, plantId, startDate: start, endDate: end, dataType: 'daily' }),
+    const historyData = await growattGet('plant/energy', token, {
+      plant_id: plantId,
+      start_date: start,
+      end_date: end,
+      time_unit: 'day',
     });
-    const historyData = await historyRes.json();
-    const records = historyData.data || [];
+    console.log('History response:', JSON.stringify(historyData).substring(0, 600));
 
-    if (records.length === 0) {
-      return Response.json({ success: true, count: 0, message: 'Sem novos dados no período' });
+    const energies = historyData.data?.energies || historyData.data?.datas || historyData.data || [];
+    if (!Array.isArray(energies) || energies.length === 0) {
+      return Response.json({ success: true, count: 0, message: 'Sem dados no período', raw: historyData });
     }
 
-    // Buscar registros existentes para evitar duplicatas
-    const existing = await base44.entities.EnergyRecord.filter({ date: { $gte: start, $lte: end } });
+    // 3. Evitar duplicatas
+    const existing = await base44.asServiceRole.entities.EnergyRecord.filter({ source_file: 'growatt_api' });
     const existingDates = new Set(existing.map(r => r.date));
 
-    const toCreate = records
-      .filter(rec => !existingDates.has(rec.date?.split(' ')[0]))
+    const toCreate = energies
       .map(rec => ({
-        date: rec.date?.split(' ')[0] || rec.date,
-        timestamp: rec.date || `${rec.date}T00:00:00Z`,
-        energy_kwh: parseFloat(rec.energy_kwh) || 0,
-        power_kw: parseFloat(rec.power_kw) || 0,
+        date: (rec.date || rec.time || '').split(' ')[0],
+        timestamp: rec.date || rec.time || new Date().toISOString(),
+        energy_kwh: parseFloat(rec.energy || rec.energy_kwh || rec.eTotal || 0),
+        power_kw: parseFloat(rec.power || rec.power_kw || rec.pac || 0),
         source_file: 'growatt_api',
-      }));
+      }))
+      .filter(r => r.date && !existingDates.has(r.date));
 
     if (toCreate.length > 0) {
-      await base44.entities.EnergyRecord.bulkCreate(toCreate);
+      await base44.asServiceRole.entities.EnergyRecord.bulkCreate(toCreate);
     }
 
-    return Response.json({ success: true, count: toCreate.length, plantId, plant: plant.plantName });
+    return Response.json({ success: true, count: toCreate.length, plantId, plant: plant.name || plant.plantName });
   } catch (error) {
     console.error('Growatt sync error:', error.message);
     return Response.json({ error: error.message }, { status: 500 });
