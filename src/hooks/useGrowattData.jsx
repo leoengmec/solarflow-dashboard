@@ -1,42 +1,40 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
-import { fetchGrowattData, getPlants } from '@/api/growattClient';
-import { toast } from 'sonner';
+const axios = require('axios');
 
-export const useGrowattData = (period) => {
-  const queryClient = useQueryClient();
-  const sn = import.meta.env.VITE_GROWATT_DEVICE_SN || 'PHE3A3301H'; // Da imagem
-
-  const { data: plants = [] } = useQuery({
-    queryKey: ['growattPlants'],
-    queryFn: getPlants,
-  });
-
-  const plantId = plants.find(p => p.plantName?.includes('Elias Alves'))?.plantId;
-
-  const { data: records, isLoading, error } = useQuery({
-    queryKey: ['growattData', period, plantId],
-    queryFn: () => fetchGrowattData(sn, plantId, period.start, period.end),
-    enabled: !!plantId && !!period.start,
-    staleTime: 30 * 60 * 1000,
-  });
-
-  const syncMutation = useMutation({
-    mutationFn: async (data) => {
-      for (const rec of data) {
-        await base44.entities.EnergyRecord.upsert({
-          date: rec.date.split(' ')[0],
-          energy_kwh: rec.energy_kwh,
-          power_kw: rec.power_kw || 0,
-        });
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['energyRecords'] });
-      toast.success('Sync Growatt OK!');
-    },
-    onError: (err) => toast.error(`Erro: ${err.message}`),
-  });
-
-  return { records, isLoading, error, sync: syncMutation.mutate };
+module.exports = async function syncGrowatt(params) {
+  const token = process.env.GROWATT_TOKEN || '11675vn9nf8q8m5uy57i3iuk53g1usyd';
+  const sn = process.env.GROWATT_SN || 'PHE3A3301H';
+  
+  try {
+    // Lista plantas
+    const plantsRes = await axios.post('https://server.growatt.com/v1/plant/getplantlistbypage', {
+      page: 1, pageSize: 50
+    }, { headers: { Authorization: `Bearer ${token}` } });
+    const plants = plantsRes.data.data || [];
+    const plantId = plants.find(p => p.plantName?.includes('Elias Alves'))?.plantId || plants[0]?.plantId;
+    
+    if (!plantId) throw new Error('Sem plantId - verifique token/planta "Elias Alves"');
+    
+    // Histórico 30 dias
+    const end = new Date().toISOString().split('T')[0];
+    const start = new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0];
+    const historyRes = await axios.post('https://server.growatt.com/v1/device/gethistorydata', {
+      sn, plantId, startDate: start, endDate: end, dataType: 'daily'
+    }, { headers: { Authorization: `Bearer ${token}` } });
+    
+    const records = historyRes.data.data || [];
+    
+    // Upsert EnergyRecord
+    for (const rec of records) {
+      await this.entities.EnergyRecord.upsert({
+        date: rec.date.split(' ')[0],
+        energy_kwh: rec.energy_kwh || 0,
+        power_kw: rec.power_kw || 0
+      });
+    }
+    
+    return { success: true, count: records.length, plantId, sample: records[0] };
+  } catch (error) {
+    console.error('Growatt sync error:', error.response?.data || error.message);
+    throw new Error(`Sync falhou: ${error.message}`);
+  }
 };
