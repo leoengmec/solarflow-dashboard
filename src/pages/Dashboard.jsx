@@ -1,3 +1,17 @@
+// Adicione estes imports no topo:
+import { useGrowattData } from '@/hooks/useGrowattData';
+
+// Dentro função Dashboard(), após const [showUpload, setShowUpload] = useState(false);:
+const { records: growattRecords, isLoading: growattLoading, sync: syncGrowatt } = useGrowattData(period);
+
+// No JSX, após <PeriodSelector /> (dentro do div bg-white):
+<Button 
+  onClick={() => syncGrowatt(growattRecords || [])}
+  disabled={growattLoading || !growattRecords}
+  className="bg-blue-500 hover:bg-blue-600 ml-4"
+>
+  🔄 Sync Growatt Automático
+</Button>
 import { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { format, subDays, parseISO, startOfMonth, endOfMonth } from "date-fns";
