@@ -5,7 +5,6 @@ module.exports = async function syncGrowatt(params) {
   const sn = process.env.GROWATT_SN || 'PHE3A3301H';
   
   try {
-    // Lista plantas
     const plantsRes = await axios.post('https://server.growatt.com/v1/plant/getplantlistbypage', {
       page: 1, pageSize: 50
     }, { headers: { Authorization: `Bearer ${token}` } });
@@ -14,7 +13,6 @@ module.exports = async function syncGrowatt(params) {
     
     if (!plantId) throw new Error('Sem plantId - verifique token/planta "Elias Alves"');
     
-    // Histórico 30 dias
     const end = new Date().toISOString().split('T')[0];
     const start = new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0];
     const historyRes = await axios.post('https://server.growatt.com/v1/device/gethistorydata', {
@@ -23,7 +21,8 @@ module.exports = async function syncGrowatt(params) {
     
     const records = historyRes.data.data || [];
     
-    // Upsert EnergyRecord
+    if (records.length === 0) return { success: true, count: 0, message: 'Sem novos dados' };
+    
     for (const rec of records) {
       await this.entities.EnergyRecord.upsert({
         date: rec.date.split(' ')[0],
