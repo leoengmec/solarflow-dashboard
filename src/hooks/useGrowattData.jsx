@@ -1,40 +1,16 @@
-const axios = require('axios');
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
+import { toast } from 'sonner';
 
-module.exports = async function syncGrowatt(params) {
-  const token = process.env.GROWATT_TOKEN || '11675vn9nf8q8m5uy57i3iuk53g1usyd';
-  const sn = process.env.GROWATT_SN || 'PHE3A3301H';
-  
-  try {
-    // Lista plantas
-    const plantsRes = await axios.post('https://server.growatt.com/v1/plant/getplantlistbypage', {
-      page: 1, pageSize: 50
-    }, { headers: { Authorization: `Bearer ${token}` } });
-    const plants = plantsRes.data.data || [];
-    const plantId = plants.find(p => p.plantName?.includes('Elias Alves'))?.plantId || plants[0]?.plantId;
-    
-    if (!plantId) throw new Error('Sem plantId - verifique token/planta "Elias Alves"');
-    
-    // Histórico 30 dias
-    const end = new Date().toISOString().split('T')[0];
-    const start = new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0];
-    const historyRes = await axios.post('https://server.growatt.com/v1/device/gethistorydata', {
-      sn, plantId, startDate: start, endDate: end, dataType: 'daily'
-    }, { headers: { Authorization: `Bearer ${token}` } });
-    
-    const records = historyRes.data.data || [];
-    
-    // Upsert EnergyRecord
-    for (const rec of records) {
-      await this.entities.EnergyRecord.upsert({
-        date: rec.date.split(' ')[0],
-        energy_kwh: rec.energy_kwh || 0,
-        power_kw: rec.power_kw || 0
-      });
-    }
-    
-    return { success: true, count: records.length, plantId, sample: records[0] };
-  } catch (error) {
-    console.error('Growatt sync error:', error.response?.data || error.message);
-    throw new Error(`Sync falhou: ${error.message}`);
-  }
+export const useGrowattSync = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => base44.functions.syncGrowatt.invoke({}),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['energyRecords'] });
+      toast.success(`Sync OK: ${data.count} registros! Plant ID: ${data.plantId}`);
+    },
+    onError: (err) => toast.error(`Sync falhou: ${err.message}`),
+  });
 };
