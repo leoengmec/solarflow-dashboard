@@ -6,15 +6,11 @@ export const useGrowattSync = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () => base44.functions.invoke('syncGrowatt', {}),
+    mutationFn: () => base44.functions.syncGrowatt.invoke({}),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['energyRecords'] });
-      toast.success(`Sync OK: ${data.count} registros! Plant ID: ${data.plantId}`);
+      toast.success(`Sync OK: ${data.count} registros!`);
     },
     onError: (err) => toast.error(`Sync falhou: ${err.message}`),
   });
-};
-
-export const useGrowattData = (period) => {
-  return { records: null, isLoading: false, sync: () => {} };
 };
