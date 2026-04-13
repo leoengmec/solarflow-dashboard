@@ -4,22 +4,22 @@ import { format, subDays } from "date-fns";
 import { Sun, Zap, TrendingUp, Upload, BarChart2, Users } from "lucide-react";
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
+import { useGrowattData } from "@/hooks/useGrowattData";
 import StatsCard from "../components/dashboard/StatsCard";
 import PeriodSelector from "../components/dashboard/PeriodSelector";
 import EnergyChart from "../components/dashboard/EnergyChart";
 import MonthlyHeatmap from "../components/dashboard/MonthlyHeatmap";
 import UploadHistory from "../components/dashboard/UploadHistory";
 import CsvUploader from "../components/upload/CsvUploader";
-import { useGrowattSync } from "@/hooks/useGrowattSync";  // Novo hook
+
+const NAV_CLASS = "inline-flex items-center px-4 py-2 rounded-md text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:bg-gray-50";
 
 function groupRecords(records, period) {
   const daysDiff = (new Date(period.end) - new Date(period.start)) / (1000 * 60 * 60 * 24);
-  let groupBy = "day";
-  if (daysDiff > 365) groupBy = "month";
-  else if (daysDiff > 90) groupBy = "month";
+  const groupBy = daysDiff > 90 ? "month" : "day";
   const groups = {};
   records.forEach(r => {
-    let key = groupBy === "month" ? r.date.substring(0, 7) : r.date;
+    const key = groupBy === "month" ? r.date.substring(0, 7) : r.date;
     if (!groups[key]) groups[key] = { label: key, energy_kwh: 0, max_power_kw: 0, count: 0 };
     groups[key].energy_kwh += r.energy_kwh || 0;
     groups[key].max_power_kw = Math.max(groups[key].max_power_kw, r.power_kw || 0);
@@ -39,7 +39,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
 
-  const { mutate: syncGrowatt, isPending: syncLoading } = useGrowattSync();
+  const { records: growattRecords, isLoading: growattLoading, sync: syncGrowatt } = useGrowattData(period);
 
   const loadData = async () => {
     setLoading(true);
@@ -53,9 +53,9 @@ export default function Dashboard() {
   };
 
   useEffect(() => { loadData(); }, []);
+
   useEffect(() => {
-    const filtered = allRecords.filter(r => r.date >= period.start && r.date <= period.end);
-    setRecords(filtered);
+    setRecords(allRecords.filter(r => r.date >= period.start && r.date <= period.end));
   }, [allRecords, period]);
 
   const stats = useMemo(() => {
@@ -71,7 +71,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header igual ao original */}
       <div className="bg-white border-b border-gray-100 px-6 py-4 shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -84,7 +83,87 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex gap-2">
-            <a href={createPageUrl("Unidades")} className="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:bg-gray-50">
+            <a href={createPageUrl("Unidades")} className={NAV_CLASS}>
               <Users className="w-4 h-4 mr-2" /> Unidades
             </a>
-            <a href={createPageUrl("Relatorios")} className="inline-flex
+            <a href={createPageUrl("Relatorios")} className={NAV_CLASS}>
+              <BarChart2 className="w-4 h-4 mr-2" /> Relatórios
+            </a>
+            <a href={createPageUrl("Tarifas")} className={NAV_CLASS}>
+              <Zap className="w-4 h-4 mr-2" /> Tarifas
+            </a>
+            <Button
+              onClick={() => setShowUpload(!showUpload)}
+              className={showUpload ? "bg-gray-200 text-gray-700 hover:bg-gray-300" : "bg-yellow-400 hover:bg-yellow-500 text-white"}
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              {showUpload ? "Fechar Upload" : "Importar"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {showUpload && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Importar Dados</h2>
+              <CsvUploader onUploadComplete={() => { loadData(); setShowUpload(false); }} />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Histórico</h2>
+              <UploadHistory logs={logs} />
+            </div>
+          </div>
+        )}
+
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
+          <PeriodSelector period={period} onPeriodChange={setPeriod} />
+          <Button
+            onClick={() => syncGrowatt(growattRecords || [])}
+            disabled={growattLoading || !growattRecords}
+            className="bg-blue-500 hover:bg-blue-600 text-white"
+          >
+            🔄 Sync Growatt
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatsCard title="Energia Total" value={stats.totalEnergy.toFixed(2)} unit="kWh" icon={Zap} color="bg-yellow-400" />
+          <StatsCard title="Média Diária" value={stats.avgDaily.toFixed(2)} unit="kWh/dia" icon={BarChart2} color="bg-orange-400" />
+          <StatsCard title="Pico de Potência" value={stats.maxPower.toFixed(2)} unit="kW" icon={TrendingUp} color="bg-amber-400" />
+          <StatsCard
+            title="CO₂ Evitado"
+            value={stats.co2Saved >= 1000 ? (stats.co2Saved / 1000).toFixed(2) : stats.co2Saved.toFixed(1)}
+            unit={stats.co2Saved >= 1000 ? "t" : "kg"}
+            icon={Sun}
+            color="bg-green-400"
+          />
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center h-64 text-gray-400">
+            <div className="text-center">
+              <Sun className="w-12 h-12 mx-auto mb-3 animate-pulse text-yellow-300" />
+              <p>Carregando dados...</p>
+            </div>
+          </div>
+        ) : records.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-64 text-gray-400 bg-white rounded-2xl shadow-sm border border-gray-100">
+            <Sun className="w-12 h-12 mb-3 text-gray-200" />
+            <p className="font-medium">Nenhum dado no período selecionado</p>
+            <p className="text-sm mt-1">Importe um CSV ou altere o período</p>
+            <Button className="mt-4 bg-yellow-400 hover:bg-yellow-500 text-white" onClick={() => setShowUpload(true)}>
+              <Upload className="w-4 h-4 mr-2" /> Importar CSV
+            </Button>
+          </div>
+        ) : (
+          <>
+            <EnergyChart data={chartData} groupBy={groupBy} />
+            <MonthlyHeatmap records={allRecords.filter(r => r.date.startsWith(currentYear.toString()))} year={currentYear} />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
