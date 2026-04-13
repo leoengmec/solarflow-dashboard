@@ -12,3 +12,7 @@ export const base44 = createClient({
   requiresAuth: false,
   appBaseUrl
 });
+// Adicione no final:
+export const triggerGrowattSync = async () => {
+  return base44.functions.syncGrowatt.invoke({}); // Trigger function
+};
